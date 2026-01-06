@@ -2,7 +2,6 @@ import requests, re, random, asyncio, jdatetime, os
 from datetime import datetime, timezone, timedelta
 from pyrogram import Client
 
-# دریافت امن اطلاعات از Secrets گیت‌هاب
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -10,7 +9,8 @@ CHANNEL_ID = "favproxy"
 
 SOURCES = [
     "https://raw.githubusercontent.com/parvinxs/Submahsanetxsparvin/refs/heads/main/Sub.mahsa.xsparvin",
-    "https://github.com/Joker-funland/V2ray-configs/raw/main/configs"
+    "https://github.com/Joker-funland/V2ray-configs/raw/main/configs",
+    "https://raw.githubusercontent.com/yebekhe/TVC/main/configs/configs" # منبع اضافه برای تنوع بیشتر
 ]
 
 def get_iran_time_date():
@@ -24,18 +24,22 @@ app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_
 async def scan_and_send():
     date_now, time_now = get_iran_time_date()
     all_found = []
+    
     for url in SOURCES:
         try:
-            r = requests.get(f"{url}?v={random.random()}", timeout=15)
+            r = requests.get(url, timeout=15)
             if r.status_code == 200:
                 found = re.findall(r'(?:vless|vmess|trojan|ss)://[^\s"\'<>]+', r.text)
                 all_found.extend(found)
         except: continue
 
-    if not all_found: return
+    # حذف تکراری‌های خودِ لیست و مخلوط کردن کل لیست
+    unique_list = list(set(all_found))
+    if not unique_list: return
     
-    random.shuffle(all_found)
-    selected = list(set(all_found))[:20] # ۲۰ عدد کانفیگ تازه
+    random.shuffle(unique_list)
+    # انتخاب ۲۰ عدد کاملا تصادفی از کل مخزن
+    selected = unique_list[:20] 
 
     for index, config in enumerate(selected, 1):
         message_text = (
@@ -52,8 +56,10 @@ async def scan_and_send():
         )
         try:
             await app.send_message(CHANNEL_ID, message_text)
-            await asyncio.sleep(3) # فاصله ۳ ثانیه
-        except: break
+            await asyncio.sleep(3) 
+        except Exception as e:
+            print(f"Error at #{index}: {e}")
+            break
 
 async def main():
     async with app:
