@@ -1,0 +1,24 @@
+name: Run Hunter Bot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # اجرای خودکار هر ۱۵ دقیقه
+  workflow_dispatch: # دکمه اجرای دستی
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install pyrogram tgcrypto requests jdatetime pysocks
+      - name: Run Hunter Script
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python hunter.py
