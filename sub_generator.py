@@ -1,16 +1,13 @@
-import asyncio, os, base64, re
+import asyncio, os, re
 from pyrogram import Client
 
-# تنظیمات از Secrets
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 
-# منابع شکار پروکسی
 SOURCES = [
     "v2ray_outline_config", "V2rayNG_VPNN", "v2ray_swat", 
-    "FreeVlessConfig", "v2rayNG_Config", "iSegaro",
-    "VmessProtocol", "V2Ray_Alpha"
+    "FreeVlessConfig", "v2rayNG_Config", "iSegaro"
 ]
 
 async def get_configs():
@@ -21,23 +18,22 @@ async def get_configs():
             try:
                 async for message in app.get_chat_history(source, limit=100):
                     if message.text:
-                        # پیدا کردن تمام پروتکل‌های V2Ray
+                        # پیدا کردن تمام لینک‌های V2ray
                         links = re.findall(r"(vless|vmess|ss|trojan)://[^\s]+", message.text)
                         found_configs.extend(links)
             except: continue
         
+        # حذف تکراری‌ها
         unique_configs = list(set(found_configs))
+        
         if unique_configs:
-            # ساخت متن خام و تبدیل به Base64 (استاندارد Sub)
+            # ذخیره به صورت متن خام (دقیقاً مثل نمونه‌ای که فرستادی)
+            # دیگه از base64 استفاده نمی‌کنیم
             raw_content = "\n".join(unique_configs)
-            b64_content = base64.b64encode(raw_content.encode('utf-8')).decode('utf-8')
             
-            # ذخیره در فایل اصلی سایت
-            with open("index.html", "w") as f:
-                f.write(b64_content)
-            print(f"✅ Sub updated with {len(unique_configs)} configs.")
-        else:
-            print("❌ No configs found!")
+            with open("index.html", "w", encoding="utf-8") as f:
+                f.write(raw_content)
+            print(f"✅ Sub updated with {len(unique_configs)} raw configs.")
 
 if __name__ == "__main__":
     asyncio.run(get_configs())
