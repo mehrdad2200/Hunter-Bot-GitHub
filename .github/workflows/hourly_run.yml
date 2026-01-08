@@ -2,14 +2,14 @@ name: Hourly Config Aggregator
 
 on:
   schedule:
-    - cron: '0 * * * *' # اجرا در دقیقه ۰ هر ساعت
-  workflow_dispatch: # امکان اجرای دستی
+    - cron: '0 * * * *' # هر ساعت برای جمع‌آوری
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # بسیار مهم برای آپدیت ساب‌لینک
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -24,24 +24,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyrogram tgcrypto jdatetime
 
-      - name: 1. Health Check & Filter
+      - name: 1. Health Check
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python checker.py
 
-      - name: 2. Send to Telegram
+      - name: 2. Send Hourly Post
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python aggregator.py
 
-      - name: 3. Generate Subscription File
+      - name: 3. Daily Report (Only at 00:00 Iran)
+        if: github.event.schedule == '0 20 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python daily_report.py
+
+      - name: 4. Update Sub Link
         run: python sub_generator.py
 
-      - name: 4. Deploy Sub Link to GitHub Pages
+      - name: 5. Deploy to Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
