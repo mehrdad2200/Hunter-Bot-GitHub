@@ -11,12 +11,12 @@ CHANNEL_ID = "favproxy"
 async def run_all_in_one():
     app = Client("hunter_bot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
     async with app:
-        # ۱. اسکن ۱۰۰ لینک آخر از پست‌های کانال
+        # ۱. اسکن دقیق کانال برای استخراج لینک‌های کامل
         final_links = []
         async for message in app.get_chat_history(CHANNEL_ID, limit=500):
             if message.text:
-                # استخراج لینک‌های خام
-                links = re.findall(r"(vless|vmess|ss|trojan)://[^\s]+", message.text)
+                # این الگو تمام کاراکترهای لینک را تا رسیدن به فضای خالی یا خط بعد برمی‌دارد
+                links = re.findall(r"(?:vless|vmess|ss|trojan)://[^\s]+", message.text)
                 for l in links:
                     if l not in final_links:
                         final_links.append(l)
@@ -25,26 +25,26 @@ async def run_all_in_one():
 
         configs_list = final_links[:100]
         if not configs_list:
-            print("No links found!")
+            print("هیچ لینکی پیدا نشد!")
             return
 
         # ۲. زمان ایران برای اسم فایل و کپشن
         now_ir = jdatetime.datetime.now()
         date_sh = now_ir.strftime("%Y/%m/%d")
         time_sh = now_ir.strftime("%H:%M")
-        # اسم فایل: 1404-10-18_18-56.txt
         file_name = now_ir.strftime("%Y-%m-%d_%H-%M") + ".txt"
 
-        # ۳. محتوای فایل (فقط لینک‌های خام پشت سر هم)
+        # ۳. محتوای فایل (فقط و فقط لینک‌های کامل خام)
+        # هر لینک در یک خط جدید، بدون هیچ کلمه اضافی
         file_body = "\n\n".join(configs_list)
 
-        # ۴. آپدیت فایل ساب‌سکرایب برای گیت‌هاب
+        # ۴. آپدیت فایل ساب‌سکرایب برای گیت‌هاب (Base64)
         raw_sub = "\n".join(configs_list)
         b64_sub = base64.b64encode(raw_sub.encode('utf-8')).decode('utf-8')
         with open("index.html", "w") as f:
             f.write(b64_sub)
 
-        # ۵. ذخیره فایل تکست
+        # ۵. ذخیره فایل متنی با فرمت UTF-8
         with open(file_name, "w", encoding="utf-8") as f:
             f.write(file_body)
 
@@ -64,9 +64,10 @@ async def run_all_in_one():
             f"🆔 @favproxy"
         )
 
-        # ۷. ارسال فایل و کپشن
+        # ۷. ارسال فایل و کپشن به کانال
         await app.send_document(CHANNEL_ID, document=file_name, caption=caption)
         
+        # پاکسازی فایل موقت
         if os.path.exists(file_name):
             os.remove(file_name)
 
