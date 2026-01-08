@@ -1,48 +1,70 @@
-import asyncio, os, base64, re
+import asyncio, os, re
 from pyrogram import Client
+import jdatetime
 
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
-MY_CHANNEL = "favproxy" # کانال خودت
+CHANNEL_ID = "favproxy"
 
-async def get_configs():
-    app = Client("proxy_worker", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
+async def send_file_post():
+    app = Client("sender", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
     async with app:
+        # ۱. جمع‌آوری ۱۰۰ کانفیگ آخر از کانال برای ریختن توی فایل txt
         found_configs = []
-        # فقط کانال خودت رو اسکن می‌کنه تا ۱۰۰ تا کانفیگ پیدا کنه
-        async for message in app.get_chat_history(MY_CHANNEL, limit=200):
+        async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 links = re.findall(r"(vless|vmess|ss|trojan)://[^\s]+", message.text)
                 found_configs.extend(links)
-                if len(found_configs) >= 100:
-                    break
+                if len(found_configs) >= 100: break
         
-        # دقیقاً ۱۰۰ تای آخر
-        final_configs = found_configs[:100]
+        configs_to_save = found_configs[:100]
         
-        if final_configs:
-            # ۱. ساخت فایل ساب (Base64) برای برنامه ها
-            raw_content = "\n".join(final_configs)
-            b64_content = base64.b64encode(raw_content.encode('utf-8')).decode('utf-8')
-            with open("index.html", "w") as f:
-                f.write(b64_content)
-            
-            # ۲. تحلیل آمار کشورها برای پست جدید
-            stats = {"🇩🇪 Germany": 0, "🇫🇮 Finland": 0, "🇳🇱 Netherlands": 0, "🇺🇸 USA": 0, "🇹🇷 Turkey": 0, "🌐 Others": 0}
-            for c in final_configs:
-                c_low = c.lower()
-                if "germany" in c_low or "de" in c_low: stats["🇩🇪 Germany"] += 1
-                elif "finland" in c_low or "fi" in c_low: stats["🇫🇮 Finland"] += 1
-                elif "netherlands" in c_low or "nl" in c_low: stats["🇳🇱 Netherlands"] += 1
-                elif "usa" in c_low or "us" in c_low: stats["🇺🇸 USA"] += 1
-                elif "turkey" in c_low or "tr" in c_low: stats["🇹🇷 Turkey"] += 1
-                else: stats["🌐 Others"] += 1
-            
-            stat_report = "\n".join([f"  └ {k}: {v}" for k, v in stats.items() if v > 0])
-            with open("stats.txt", "w", encoding="utf-8") as f:
-                f.write(f"🚀 TOTAL: {len(final_configs)} Verified Configs\n{stat_report}")
-            print(f"✅ 100 configs collected from @{MY_CHANNEL}")
+        if not configs_to_save:
+            print("No configs found to send!")
+            return
+
+        # ۲. ایجاد فایل متنی
+        file_name = "HUNTER_CONFIGS.txt"
+        with open(file_name, "w", encoding="utf-8") as f:
+            f.write("\n".join(configs_to_save))
+
+        # ۳. آماده‌سازی آمار برای کپشن
+        stats = {"🇩🇪 Germany": 0, "🇫🇮 Finland": 0, "🌐 Others": 0}
+        for c in configs_to_save:
+            c_low = c.lower()
+            if "germany" in c_low or "de" in c_low: stats["🇩🇪 Germany"] += 1
+            elif "finland" in c_low or "fi" in c_low: stats["🇫🇮 Finland"] += 1
+            else: stats["🌐 Others"] += 1
+        
+        stat_report = "\n".join([f"  └ {k}: {v}" for k, v in stats.items() if v > 0])
+        
+        now = jdatetime.datetime.now()
+        date_str = now.strftime("%Y/%m/%d")
+        time_str = now.strftime("%H:%M")
+        SUB_LINK = "https://mehrdad2200.github.io/Hunter-Bot-GitHub/"
+
+        caption = (
+            f"💠 HUNTER PREMIUM CONFIGS\n"
+            f"──────────────────────\n"
+            f"📅 DATE: {date_str}  |  ⏰ TIME: {time_str}\n"
+            f"🚀 TOTAL: {len(configs_to_save)} Verified Configs\n"
+            f"🌍 LOCATION STATS:\n{stat_report}\n"
+            f"🌐 NETWORK STATUS: Global Online ✅\n"
+            f"──────────────────────\n"
+            f"🔗 SUBSCRIPTION LINK (Tap to Copy):\n"
+            f"`{SUB_LINK}`\n\n"
+            f"💡 *Copy the link above and paste it into your app (v2rayNG / Shadowrocket) for auto-updates.*\n"
+            f"──────────────────────\n"
+            f"🆔 @favproxy"
+        )
+
+        # ۴. آپلود فایل به همراه کپشن
+        await app.send_document(CHANNEL_ID, document=file_name, caption=caption)
+        
+        # پاک کردن فایل موقت از روی سرور گیت‌هاب
+        if os.path.exists(file_name):
+            os.remove(file_name)
 
 if __name__ == "__main__":
-    asyncio.run(get_configs())
+    asyncio.run(send_file_post())
