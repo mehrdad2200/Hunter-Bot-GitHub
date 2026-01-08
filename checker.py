@@ -1,45 +1,37 @@
-import asyncio, os, re, requests
+import asyncio, os, re
 from pyrogram import Client
 
+# تنظیمات از گیت‌هاب سکرت
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 CHANNEL_ID = "favproxy"
 
-async def check_config(link):
-    # این یک تست ساده برای بررسی فرمت و زنده بودن اولیه است
-    # برای تست واقعی پینگ در محیط سرور، فیلتر کردن لینک‌های شکسته انجام می‌شود
-    try:
-        if len(link) < 15: return None
-        # اینجا می‌توان منطق تست پینگ پیشرفته را اضافه کرد
-        return link
-    except:
-        return None
-
 async def main():
     app = Client("checker_task", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
     async with app:
         configs = []
+        # بررسی پیام‌های اخیر کانال
         async for message in app.get_chat_history(CHANNEL_ID, limit=150):
             if message.text:
+                # استخراج لینک‌های v2ray
                 links = re.findall(r'(?:vless|vmess|trojan|ss)://[^\s"\'<>]+', message.text)
                 configs.extend(links)
         
+        # حذف تکراری‌ها
         unique_configs = list(set(configs))
         valid_configs = []
         
-        print(f"Total found: {len(unique_configs)}. Starting health check...")
-        
-        # تست سریع (در این نسخه لینک‌های ناقص و تکراری فیلتر می‌شوند)
+        # فیلتر اولیه (لینک‌های بسیار کوتاه یا ناقص حذف می‌شوند)
         for link in unique_configs:
-            checked = await check_config(link)
-            if checked:
-                valid_configs.append(checked)
+            if len(link) > 25: 
+                valid_configs.append(link)
         
-        # ذخیره موقت برای استفاده در مراحل بعدی
+        # ذخیره در فایل واسط برای بقیه اسکریپت‌ها
         with open("validated_configs.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(valid_configs))
-        print(f"Health check finished. Valid: {len(valid_configs)}")
+        
+        print(f"Done! Found {len(valid_configs)} valid configs.")
 
 if __name__ == "__main__":
     asyncio.run(main())
