@@ -1,6 +1,5 @@
-import asyncio, os, random, json, re
+import asyncio, os, random, json
 from pyrogram import Client
-import google.generativeai as genai
 from openai import OpenAI
 
 # تنظیمات اصلی
@@ -9,7 +8,6 @@ API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 CHANNEL_ID = "FavmeMusic"
 
-# کلیدهای هوش مصنوعی از Secrets
 KEYS = {
     "GEMINI": os.environ.get("GEMINI_KEY"),
     "GROQ": os.environ.get("GROQ_KEY"),
@@ -17,105 +15,86 @@ KEYS = {
     "OPENROUTER": os.environ.get("OPENROUTER_KEY")
 }
 
-async def generate_human_text(prompt):
-    # اولویت ۱: Gemini
-    if KEYS["GEMINI"]:
-        try:
-            genai.configure(api_key=KEYS["GEMINI"])
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            return response.text
-        except: pass
+PRIORITY_SOURCES = [
+    "https://t.me/+750iUoFndkc5NDc8",
+    "https://t.me/+TdHVAC-9SYAyMWI0",
+    "musicbazpage",
+    "InnerSpce"
+]
 
-    # اولویت ۲: Groq
-    if KEYS["GROQ"]:
-        try:
-            client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=KEYS["GROQ"])
-            response = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
-            )
-            return response.choices[0].message.content
-        except: pass
-
-    # اولویت ۳: Cerebras
-    if KEYS["CEREBRAS"]:
-        try:
-            client = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=KEYS["CEREBRAS"])
-            response = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama3.1-70b",
-            )
-            return response.choices[0].message.content
-        except: pass
-
-    # اولویت ۴: OpenRouter
-    if KEYS["OPENROUTER"]:
-        try:
-            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=KEYS["OPENROUTER"])
-            response = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="google/gemini-2.0-flash-exp:free",
-            )
-            return response.choices[0].message.content
-        except: pass
-
-    return "یک موسیقی ناب برای لحظات شما. بشنویم و لذت ببریم.\n\n#موسیقی #پیشنهاد"
+async def get_creative_note(band, title):
+    """تولید نوت کوتاه و خاص توسط AI"""
+    prompt = f"Band: {band}, Title: {title}. یک جمله بسیار کوتاه (۵ کلمه) عمیق و انتزاعی به فارسی بنویس. فقط جمله را بفرست."
+    for provider in ["GEMINI", "GROQ", "OPENROUTER"]:
+        if KEYS[provider]:
+            try:
+                base_url = "https://generativelanguage.googleapis.com/v1beta/openai/" if provider == "GEMINI" else \
+                           ("https://api.groq.com/openai/v1" if provider == "GROQ" else "https://openrouter.ai/api/v1")
+                client = OpenAI(base_url=base_url, api_key=KEYS[provider])
+                resp = client.chat.completions.create(
+                    model="gemini-1.5-flash" if provider == "GEMINI" else "llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}], timeout=7
+                )
+                return resp.choices[0].message.content.strip()
+            except: continue
+    return "انعکاسِ یک سکوت."
 
 async def music_hunter():
     app = Client("music_hunter_bot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
     async with app:
-        # مدیریت وضعیت (نوبت و تاریخچه)
         state_file = "hunter_state.json"
         if os.path.exists(state_file):
             try:
                 with open(state_file, "r") as f: state = json.load(f)
-            except: state = {"counter": 0, "history": []}
-        else: state = {"counter": 0, "history": []}
-
-        state["counter"] += 1
-        is_farsi = (state["counter"] % 4 == 1) # چرخه ۱ فارسی، ۳ خارجی
-        
-        # استراتژی جستجو
-        search_queries = ["آهنگ جدید", "موزیک فارسی"] if is_farsi else ["new music", "remix 2026", "deep house", "techno"]
-        query = random.choice(search_queries)
-        
-        print(f"--- Hunting Phase: {'Farsi' if is_farsi else 'Global'} | Query: {query} ---")
+            except: state = {"history": [], "post_count": 2580}
+        else: state = {"history": [], "post_count": 2580}
 
         count = 0
-        async for message in app.search_global(query, limit=200):
-            if count >= 45: break # هدف ۳۰ تا ۵۰ آهنگ
-            
-            if message.audio:
-                file_id = message.audio.file_unique_id
-                if file_id not in state["history"]:
-                    count += 1
-                    state["history"].append(file_id)
-                    
-                    # استخراج نام منبع
-                    source = f"@{message.chat.username}" if message.chat.username else (message.chat.title or "منبع ناشناس")
-                    
-                    # پرومپت برای هوش مصنوعی
-                    f_name = message.audio.file_name or "Unknown"
-                    orig_cap = message.caption or ""
-                    prompt = f"فایل: {f_name}. کپشن: {orig_cap}. این موزیک رو تحلیل کن و یک معرفی ۳ خطی صمیمی و انسانی به زبان فارسی بنویس. اصلاً رباتیک نباشه. آخرش هشتگ خواننده و سبک بزن."
-                    
-                    human_text = await generate_human_text(prompt)
-                    
-                    final_caption = (
-                        f"{human_text}\n\n"
-                        f"🎵 شکار شده از: {source}\n"
-                        f"🆔 @FavmeMusic"
-                    )
-                    
-                    try:
-                        await app.copy_message(CHANNEL_ID, message.chat.id, message.id, caption=final_caption)
-                        print(f"Successfully posted: {f_name}")
-                        await asyncio.sleep(4) # فاصله برای جلوگیری از بلاک
-                    except: continue
+        for source in PRIORITY_SOURCES:
+            if count >= 50: break
+            try:
+                chat = await app.get_chat(source)
+                async for message in app.get_chat_history(chat.id, limit=80):
+                    if count >= 50: break
+                    if message.audio and message.audio.file_unique_id not in state["history"]:
+                        
+                        audio = message.audio
+                        band = audio.performer or "Various Artists"
+                        title = audio.title or "Unknown Track"
+                        album = audio.file_name.split('-')[0] if not getattr(audio, 'album', None) else audio.album
+                        
+                        # استخراج اطلاعات فنی
+                        duration = f"{audio.duration // 60}:{audio.duration % 60:02d}"
+                        size = f"{audio.file_size / (1024 * 1024):.1f} MB"
+                        
+                        ai_note = await get_creative_note(band, title)
+                        
+                        state["history"].append(audio.file_unique_id)
+                        state["post_count"] += 1
+                        count += 1
+                        
+                        # دیزاینِ مدرن و شیک (Layout)
+                        post_id = str(state["post_count"]).zfill(2)
+                        
+                        caption = (
+                            f"● {post_id}. {ai_note}\n\n"
+                            f"   | Band: {band}\n"
+                            f"   | Title: {title}\n"
+                            f"   | Album: {album if album else 'Single'}\n"
+                            f"   | Duration: {duration}\n"
+                            f"   | Size: {size}\n"
+                            f"   | Genres: #PostRock #Ambient\n\n"
+                            f"🆔 @FavmeMusic"
+                        )
+                        
+                        try:
+                            await app.copy_message(CHANNEL_ID, chat.id, message.id, caption=caption)
+                            print(f"✅ Hunted: {post_id}")
+                            await asyncio.sleep(4)
+                        except: continue
+            except: continue
 
-        # ذخیره وضعیت (۱۰۰۰ آهنگ آخر برای جلوگیری از تکرار)
-        state["history"] = state["history"][-1000:]
+        state["history"] = state["history"][-2000:]
         with open(state_file, "w") as f: json.dump(state, f)
 
 if __name__ == "__main__":
