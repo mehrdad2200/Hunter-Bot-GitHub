@@ -1,4 +1,4 @@
-import asyncio, os, random, json
+import asyncio, os, random, json, re
 from pyrogram import Client
 from openai import OpenAI
 
@@ -6,97 +6,91 @@ from openai import OpenAI
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
-CHANNEL_ID = "FavmeMusic" 
+CHANNEL_ID = "FavmeMusic"
 
 KEYS = {
     "GEMINI": os.environ.get("GEMINI_KEY"),
     "GROQ": os.environ.get("GROQ_KEY")
 }
 
-async def generate_human_text(prompt):
+# منابعی که مهرداد فرستاد (اولویت اول)
+PRIORITY_SOURCES = [
+    "https://t.me/+750iUoFndkc5NDc8",
+    "https://t.me/+TdHVAC-9SYAyMWI0",
+    "musicbazpage",
+    "InnerSpce"
+]
+
+async def generate_favme_style_text(file_name):
+    """تولید متن به سبک کانال Favme: کوتاه، خاص و هنری"""
+    prompt = f"""
+    نام فایل موسیقی: {file_name}
+    یک جمله بسیار کوتاه (حداکثر ۱۰ کلمه) بنویس که حال و هوای این آهنگ را توصیف کند.
+    سبک نوشتن: هنری، کمی غمگین یا عاشقانه، شبیه کپشن پست های تلگرامی خاص. 
+    اصلا نگو 'این آهنگ فلان است'. 
+    مثال: 'غرق در سکوتِ میانِ نت‌ها.' یا 'انعکاسِ یک خاطره در شب.'
+    فقط و فقط جمله را بنویس، بدون هیچ مقدمه یا هشتگ اضافی.
+    """
     try:
-        # استفاده از Gemini به عنوان موتور اصلی
         client = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=KEYS["GEMINI"])
         resp = client.chat.completions.create(model="gemini-1.5-flash", messages=[{"role": "user", "content": prompt}])
-        return resp.choices[0].message.content
+        return resp.choices[0].message.content.strip()
     except:
-        return "یک موسیقی ناب برای لحظات شما. بشنویم و لذت ببریم.\n\n#موسیقی"
+        return ""
 
 async def music_hunter():
     app = Client("music_hunter_bot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
     async with app:
         state_file = "hunter_state.json"
+        
+        # مدیریت وضعیت (تاریخچه و شماره پست دائمی)
         if os.path.exists(state_file):
             try:
                 with open(state_file, "r") as f: state = json.load(f)
-            except: state = {"history": []}
-        else: state = {"history": []}
+            except: state = {"history": [], "post_count": 0}
+        else: state = {"history": [], "post_count": 0}
+        
         state.setdefault("history", [])
+        state.setdefault("post_count", 0)
 
-        count = 0
-        sources_this_run = []
-        
-        # ۱. استراتژی اول: جستجوی جهانی (رندوم)
-        search_terms = ["remix 2026", "آهنگ جدید", "music mp3", "top track"]
-        random.shuffle(search_terms)
-        
-        # ۲. استراتژی دوم (پشتیبان): لیست کانال‌های هدف برای اینکه لیست حتما پر بشه
-        # این‌ها فقط مثال هستن، می‌تونی یوزرنیم کانال‌های غول موزیک رو اینجا اضافه کنی
-        backup_channels = [
-            "melobit", "radiojavan", "MifaMusic_ir", "Ahang_Nab", "Nex1Music_com", 
-            "worldmusic7", "deephousenation", "The_Top_Music", "G_Music", "top_music_ir"
-        ]
-        random.shuffle(backup_channels)
+        count_in_this_run = 0
+        print(f"--- 🚀 Hunter Started. Starting from Post: {state['post_count'] + 1} ---")
 
-        print("--- 🚀 High Intensity Hunting Started ---")
-
-        # اول سعی میکنیم از کل تلگرام بگیریم
-        for query in search_terms:
-            if count >= 50: break
+        # اسکن منابع اولویت‌دار
+        for source in PRIORITY_SOURCES:
+            if count_in_this_run >= 50: break
             try:
-                async for message in app.search_global(query, limit=50):
-                    if count >= 50: break
-                    if message.audio and message.chat.id not in sources_this_run:
-                        if message.audio.file_unique_id not in state["history"]:
-                            await process_and_post(app, message, state, sources_this_run, CHANNEL_ID)
-                            count += 1
-                            await asyncio.sleep(3.5)
-            except: continue
+                # ورود به لینک‌های خصوصی یا عمومی
+                chat = await app.get_chat(source)
+                async for message in app.get_chat_history(chat.id, limit=40):
+                    if count_in_this_run >= 50: break
+                    
+                    if message.audio and message.audio.file_unique_id not in state["history"]:
+                        f_id = message.audio.file_unique_id
+                        state["history"].append(f_id)
+                        state["post_count"] += 1
+                        count_in_this_run += 1
+                        
+                        f_name = message.audio.file_name or "Unknown"
+                        ai_text = await generate_favme_style_text(f_name)
+                        
+                        # فرمت کپشن دقیقاً طبق سلیقه مهرداد
+                        source_display = f"@{chat.username}" if chat.username else chat.title
+                        formatted_count = str(state["post_count"]).zfill(2) # تبدیل به 01, 02...
+                        
+                        caption = f"{formatted_count}. {ai_text}\n\n🔹 منبع: {source_display}\n🆔 @FavmeMusic"
+                        
+                        await app.copy_message(CHANNEL_ID, chat.id, message.id, caption=caption)
+                        print(f"✅ Posted #{formatted_count}: {f_name}")
+                        await asyncio.sleep(4)
+            except Exception as e:
+                print(f"Error on source {source}: {e}")
+                continue
 
-        # اگر هنوز به ۵۰ تا نرسیدیم، میریم سراغ مخازن اصلی (لیست پرکن)
-        if count < 50:
-            print(f"Global search limited. Filling the list from backup channels... Current: {count}")
-            for target in backup_channels:
-                if count >= 50: break
-                try:
-                    async for message in app.get_chat_history(target, limit=20):
-                        if count >= 50: break
-                        if message.audio and message.audio.file_unique_id not in state["history"]:
-                            await process_and_post(app, message, state, sources_this_run, CHANNEL_ID)
-                            count += 1
-                            await asyncio.sleep(3.5)
-                except: continue
-
-        # ذخیره وضعیت
+        # ذخیره نهایی وضعیت (تاریخچه و شماره آخرین پست)
         state["history"] = state["history"][-2000:]
         with open(state_file, "w") as f: json.dump(state, f)
-        print(f"--- Finished! Total Hunted: {count} ---")
-
-async def process_and_post(app, message, state, sources_this_run, target_channel):
-    f_id = message.audio.file_unique_id
-    state["history"].append(f_id)
-    sources_this_run.append(message.chat.id)
-    
-    source = f"@{message.chat.username}" if message.chat.username else message.chat.title
-    prompt = f"فایل '{message.audio.file_name}'. معرفی انسانی و صمیمی ۳ خطی به فارسی. آخرش هشتگ خواننده و سبک."
-    
-    ai_text = await generate_human_text(prompt)
-    caption = f"{ai_text}\n\n🔹 منبع شکار: {source}\n🆔 @FavmeMusic"
-    
-    try:
-        await app.copy_message(target_channel, message.chat.id, message.id, caption=caption)
-    except Exception as e:
-        print(f"Post Error: {e}")
+        print(f"--- Finished! Next Post ID will be: {state['post_count'] + 1} ---")
 
 if __name__ == "__main__":
     asyncio.run(music_hunter())
