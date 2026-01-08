@@ -2,14 +2,14 @@ name: Hourly Config Aggregator
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *' # اجرا در دقیقه ۰ هر ساعت
+  workflow_dispatch: # امکان اجرای دستی
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # اجازه نوشتن برای ساخت برنچ gh-pages
+      contents: write # بسیار مهم برای آپدیت ساب‌لینک
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -24,21 +24,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyrogram tgcrypto jdatetime
 
-      - name: Run Aggregator (Telegram Post)
+      - name: 1. Health Check & Filter
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python checker.py
+
+      - name: 2. Send to Telegram
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python aggregator.py
 
-      - name: Run Sub Generator (Create Index)
-        env:
-          API_ID: ${{ secrets.API_ID }}
-          API_HASH: ${{ secrets.API_HASH }}
-          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+      - name: 3. Generate Subscription File
         run: python sub_generator.py
 
-      - name: Deploy to GitHub Pages
+      - name: 4. Deploy Sub Link to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
