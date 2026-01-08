@@ -1,4 +1,4 @@
-import asyncio, os, jdatetime, re
+import asyncio, os, jdatetime
 from pyrogram import Client
 from datetime import datetime, timedelta, timezone
 
@@ -16,24 +16,14 @@ def get_iran_time():
     return shamsi.strftime("%Y/%m/%d"), shamsi.strftime("%H:%M")
 
 async def collect_and_upload():
-    # چک کردن وجود فایل تایید شده
-    if not os.path.exists("validated_configs.txt"):
-        print("No validated configs found.")
-        return
-
+    if not os.path.exists("validated_configs.txt"): return
     with open("validated_configs.txt", "r", encoding="utf-8") as f:
         unique_configs = f.read().splitlines()
-
-    if not unique_configs:
-        print("Config list is empty.")
-        return
+    if not unique_configs: return
 
     async with app:
         date_str, time_str = get_iran_time()
-        sub_link = f"https://{app.me.username if hasattr(app, 'me') else 'mehrdad2200'}.github.io/Hunter-Bot-GitHub/"
-        # نکته: اگر نام کاربری گیت‌هابت متفاوت است، لینک زیر را دستی تنظیم کن:
         sub_link = "https://mehrdad2200.github.io/Hunter-Bot-GitHub/"
-
         caption_text = (
             f"💠 **HUNTER PREMIUM CONFIGS**\n"
             f"──────────────────────\n"
@@ -47,18 +37,11 @@ async def collect_and_upload():
             f"──────────────────────\n"
             f"🆔 @{CHANNEL_ID}"
         )
-
-        # نام فایل به فرمت شمسی: 1404-10-20_14-30.txt
         file_name = f"{date_str.replace('/', '-')}_{time_str.replace(':', '-')}.txt"
-        
         with open(file_name, "w", encoding="utf-8") as f:
             f.write("\n\n".join(unique_configs))
-
         await app.send_document(CHANNEL_ID, document=file_name, caption=caption_text)
-        
-        # پاکسازی فایل‌های محلی
-        if os.path.exists(file_name):
-            os.remove(file_name)
+        os.remove(file_name)
 
 if __name__ == "__main__":
     app.run(collect_and_upload())
