@@ -1,2 +1,3 @@
-🚀 TOTAL: 1 Verified Configs
-  └ 🌐 Others: 1
+🚀 TOTAL: 100 Verified Configs
+  └ 🇹🇷 Turkey: 17
+  └ 🌐 Others: 83
