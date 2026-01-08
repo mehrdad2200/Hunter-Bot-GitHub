@@ -1,9 +1,9 @@
-name: Hourly Proxy Aggregator & Sub Update
+name: Hourly Hunter Bot Update
 
 on:
   schedule:
     - cron: '0 * * * *' # اجرای خودکار سر هر ساعت
-  workflow_dispatch: # امکان اجرای دستی
+  workflow_dispatch: # امکان اجرای دستی برای تست
 
 jobs:
   build:
@@ -12,45 +12,37 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository Content
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: Install Dependencies
+      - name: Install Python Dependencies
         run: |
           pip install pyrogram tgcrypto jdatetime
 
-      - name: 1. Generate Sub & Stats
-        # این مرحله فایل index.html و stats.txt را می‌سازد
-        env:
-          API_ID: ${{ secrets.API_ID }}
-          API_HASH: ${{ secrets.API_HASH }}
-          SESSION_STRING: ${{ secrets.SESSION_STRING }}
-        run: python sub_generator.py
-
-      - name: 2. Send Telegram Post
-        # این مرحله پست با ظاهر جدید را به کانال می‌فرستد
+      - name: Run Aggregator (Scans, Generates File & Sends to Telegram)
+        # این مرحله فایل تکست را می سازد، به تلگرام می فرستد و index.html را آپدیت می کند
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python aggregator.py
 
-      - name: 3. Commit and Push Sub to GitHub
-        # این مرحله باعث می‌شود لینک گیت‌هاب تو آپدیت شود و در v2ray کار کند
+      - name: Update GitHub Pages Subscription Link
+        # این مرحله فایل index.html جدید را در گیت هاب شما ذخیره می کند
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add index.html
-          git commit -m "Update Subscription: $(date)" || exit 0
+          git commit -m "Update Subscription Configs" || exit 0
           git push origin main
 
-      - name: 4. Deploy to GitHub Pages
-        # برای اطمینان از اینکه لینک https://mehrdad2200.github.io/... همیشه زنده بماند
+      - name: Deploy to GitHub Pages
+        # این مرحله برای اطمینان از زنده بودن لینک https://mehrdad2200.github.io/... است
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
