@@ -4,5 +4,5 @@ requests
 jdatetime
 pysocks
 Pillow
-google-generativeai
+google-genai
 openai
