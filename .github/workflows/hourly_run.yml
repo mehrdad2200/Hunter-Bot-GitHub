@@ -1,17 +1,18 @@
-name: Hourly Sub Update
+name: Hourly Proxy Aggregator & Sub Update
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *' # اجرای خودکار سر هر ساعت
+  workflow_dispatch: # امکان اجرای دستی
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -19,20 +20,39 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
-        run: pip install pyrogram tgcrypto
+      - name: Install Dependencies
+        run: |
+          pip install pyrogram tgcrypto jdatetime
 
-      - name: Update Sub File
+      - name: 1. Generate Sub & Stats
+        # این مرحله فایل index.html و stats.txt را می‌سازد
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python sub_generator.py
 
-      - name: Commit and Push
+      - name: 2. Send Telegram Post
+        # این مرحله پست با ظاهر جدید را به کانال می‌فرستد
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python aggregator.py
+
+      - name: 3. Commit and Push Sub to GitHub
+        # این مرحله باعث می‌شود لینک گیت‌هاب تو آپدیت شود و در v2ray کار کند
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add index.html
-          git commit -m "Update Sub Link" || exit 0
-          git push
+          git commit -m "Update Subscription: $(date)" || exit 0
+          git push origin main
+
+      - name: 4. Deploy to GitHub Pages
+        # برای اطمینان از اینکه لینک https://mehrdad2200.github.io/... همیشه زنده بماند
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_files: index.html
