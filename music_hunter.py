@@ -1,6 +1,5 @@
 import asyncio, os, random, json
 from pyrogram import Client
-import google.genai as google_genai # اصلاح نحوه ایمپورت برای رفع ارور
 from openai import OpenAI
 
 # تنظیمات اصلی از Secrets
@@ -19,12 +18,16 @@ KEYS = {
 
 async def generate_human_text(prompt):
     """تولید متن با سیستم جایگزینی هوشمند (اولویت ۱ تا ۴)"""
-    # ۱. اولویت اصلی: Gemini 2.0
+    
+    # ۱. اولویت اصلی: Gemini (از طریق رابط OpenAI برای پایداری ۱۰۰٪)
     if KEYS["GEMINI"]:
         try:
-            client = google_genai.Client(api_key=KEYS["GEMINI"])
-            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            return response.text
+            client = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=KEYS["GEMINI"])
+            resp = client.chat.completions.create(
+                model="gemini-1.5-flash",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return resp.choices[0].message.content
         except: pass
 
     # ۲. اولویت دوم: Groq
@@ -59,29 +62,28 @@ async def music_hunter():
     async with app:
         state_file = "hunter_state.json"
         
-        # مدیریت وضعیت و رفع خطای KeyError
+        # مدیریت وضعیت و رفع خطای احتمالی فایل
         if os.path.exists(state_file):
             try:
                 with open(state_file, "r") as f: 
                     state = json.load(f)
-                state.setdefault("counter", 0)
-                state.setdefault("history", [])
             except: state = {"counter": 0, "history": []}
         else: state = {"counter": 0, "history": []}
 
+        state.setdefault("counter", 0)
+        state.setdefault("history", [])
+        
         state["counter"] += 1
         is_farsi = (state["counter"] % 4 == 1) # ۱ بار فارسی، ۳ بار خارجی
         
-        # انتخاب کلمه کلیدی رندوم برای شکار
         queries = ["آهنگ جدید", "موزیک ایرانی", "ریمیکس"] if is_farsi else ["new music", "remix 2026", "techno", "deep house", "top charts"]
         query = random.choice(queries)
         
         print(f"--- 🚀 Hunting Mode: {'Farsi' if is_farsi else 'Global'} | Query: {query} ---")
 
         count = 0
-        # جستجو در کل تلگرام
         async for message in app.search_global(query, limit=500):
-            if count >= 50: break # شکار ۵۰ عدد در هر بار اجرا
+            if count >= 50: break # شکار ۵۰ عدد
             
             if message.audio:
                 f_id = message.audio.file_unique_id
@@ -92,7 +94,6 @@ async def music_hunter():
                     source = f"@{message.chat.username}" if message.chat.username else (message.chat.title or "منبع")
                     f_name = message.audio.file_name or "Unknown"
                     
-                    # دستور به هوش مصنوعی برای تولید کپشن انسانی
                     prompt = f"فایل موسیقی '{f_name}' پیدا شده. یک معرفی انسانی و صمیمی ۳ خطی به فارسی بنویس که اصلا شبیه ربات نباشه. آخرش هشتگ خواننده و سبک بزن."
                     
                     ai_text = await generate_human_text(prompt)
@@ -101,10 +102,9 @@ async def music_hunter():
                     try:
                         await app.copy_message(CHANNEL_ID, message.chat.id, message.id, caption=final_caption)
                         print(f"✅ [{count}] Posted: {f_name}")
-                        await asyncio.sleep(3) # وقفه برای امنیت اکانت
+                        await asyncio.sleep(3) 
                     except: continue
 
-        # ذخیره وضعیت و نگهداری ۲۰۰۰ آی‌دی آخر
         state["history"] = state["history"][-2000:]
         with open(state_file, "w") as f:
             json.dump(state, f)
