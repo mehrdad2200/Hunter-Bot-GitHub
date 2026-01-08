@@ -2,7 +2,7 @@ name: Hourly Config Aggregator
 
 on:
   schedule:
-    - cron: '0 * * * *' # هر ساعت برای جمع‌آوری
+    - cron: '0 * * * *' # هر ساعت اجرا می‌شود
   workflow_dispatch:
 
 jobs:
@@ -46,12 +46,17 @@ jobs:
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python daily_report.py
 
-      - name: 4. Update Sub Link
+      - name: 4. Update Sub Link (Proxy Hunter)
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python sub_generator.py
 
-      - name: 5. Deploy to Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_files: index.html
+      - name: 5. Save and Push Changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add index.html
+          git commit -m "Update Proxy Sub: $(date)" || exit 0
+          git push
