@@ -1,15 +1,15 @@
-import asyncio, os, random, json, re
+import asyncio, os, random, json
 from pyrogram import Client
-from google import genai 
+import google.genai as google_genai
 from openai import OpenAI
 
-# تنظیمات اصلی
+# تنظیمات تلگرام و کانال
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 CHANNEL_ID = "FavmeMusic"
 
-# کلیدهای هوش مصنوعی (Sercets)
+# کلیدهای هوش مصنوعی از Secrets گیت‌هاب
 KEYS = {
     "GEMINI": os.environ.get("GEMINI_KEY"),
     "GROQ": os.environ.get("GROQ_KEY"),
@@ -18,16 +18,16 @@ KEYS = {
 }
 
 async def generate_human_text(prompt):
-    """مدیریت هوشمند خروجی هوش مصنوعی با اولویت‌بندی"""
-    # ۱. اولویت اول: Gemini 2.0
+    """تولید متن با سیستم Failover (اولویت‌بندی ۴ مرحله‌ای)"""
+    # ۱. Gemini 2.0 (اولویت اصلی)
     if KEYS["GEMINI"]:
         try:
-            client = genai.Client(api_key=KEYS["GEMINI"])
+            client = google_genai.Client(api_key=KEYS["GEMINI"])
             response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
             return response.text
         except: pass
 
-    # ۲. اولویت دوم: Groq
+    # ۲. Groq
     if KEYS["GROQ"]:
         try:
             client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=KEYS["GROQ"])
@@ -38,7 +38,7 @@ async def generate_human_text(prompt):
             return resp.choices[0].message.content
         except: pass
 
-    # ۳. لایه پشتیبان نهایی (Cerebras یا OpenRouter)
+    # ۳ و ۴. لایه‌های رزرو
     for provider in ["CEREBRAS", "OPENROUTER"]:
         if KEYS[provider]:
             url = "https://api.cerebras.ai/v1" if provider == "CEREBRAS" else "https://openrouter.ai/api/v1"
@@ -59,27 +59,29 @@ async def music_hunter():
     async with app:
         state_file = "hunter_state.json"
         
-        # لود کردن دیتابیس وضعیت
+        # لود کردن دیتابیس وضعیت (جلوگیری از تکرار و مدیریت نوبت)
         if os.path.exists(state_file):
             try:
-                with open(state_file, "r") as f: 
-                    state = json.load(f)
-                state.setdefault("counter", 0)
-                state.setdefault("history", [])
+                with open(state_file, "r") as f: state = json.load(f)
             except: state = {"counter": 0, "history": []}
         else: state = {"counter": 0, "history": []}
 
+        state.setdefault("counter", 0)
+        state.setdefault("history", [])
+        
         state["counter"] += 1
         is_farsi = (state["counter"] % 4 == 1) # ۱ بار فارسی، ۳ بار خارجی
         
-        queries = ["آهنگ جدید", "موزیک ایرانی"] if is_farsi else ["new music", "remix 2026", "techno", "deep house"]
+        # انتخاب کلمات کلیدی برای جستجوی رندوم
+        queries = ["آهنگ جدید", "موزیک ایرانی", "ریمیکس"] if is_farsi else ["new music", "remix 2026", "techno", "deep house", "top charts"]
         query = random.choice(queries)
         
         print(f"--- 🚀 Hunting Mode: {'Farsi' if is_farsi else 'Global'} | Query: {query} ---")
 
         count = 0
-        async for message in app.search_global(query, limit=400):
-            if count >= 50: break # شکار ۵۰ عدد در هر اجرا
+        # جستجوی گسترده در کل تلگرام
+        async for message in app.search_global(query, limit=500):
+            if count >= 50: break # هدف: ۵۰ پست در هر اجرا
             
             if message.audio:
                 f_id = message.audio.file_unique_id
@@ -87,10 +89,11 @@ async def music_hunter():
                     count += 1
                     state["history"].append(f_id)
                     
-                    source = f"@{message.chat.username}" if message.chat.username else (message.chat.title or "منبع")
+                    source = f"@{message.chat.username}" if message.chat.username else (message.chat.title or "منبع ناشناس")
                     f_name = message.audio.file_name or "Unknown"
                     
-                    prompt = f"فایل موسیقی '{f_name}' پیدا شده. یک معرفی انسانی و صمیمی ۳ خطی به فارسی بنویس که اصلا شبیه ربات نباشه. آخرش هشتگ خواننده و سبک بزن."
+                    # پرومپت تحقیق برای هوش مصنوعی
+                    prompt = f"فایل موسیقی '{f_name}' پیدا شده. یک معرفی انسانی، صمیمی و تحلیلی ۳ خطی به زبان فارسی درباره این سبک یا خواننده بنویس. اصلاً شبیه ربات نباش. در انتها فقط هشتگ نام خواننده و سبک را بزن."
                     
                     ai_text = await generate_human_text(prompt)
                     final_caption = f"{ai_text}\n\n🎵 منبع شکار: {source}\n🆔 @FavmeMusic"
@@ -98,13 +101,14 @@ async def music_hunter():
                     try:
                         await app.copy_message(CHANNEL_ID, message.chat.id, message.id, caption=final_caption)
                         print(f"✅ [{count}] Posted: {f_name}")
-                        await asyncio.sleep(2.5) # فاصله ایمن
+                        await asyncio.sleep(3) # وقفه ایمن برای جلوگیری از محدودیت تلگرام
                     except: continue
 
-        # ذخیره و تمیزکاری تاریخچه
+        # ذخیره وضعیت جدید و محدود کردن حجم تاریخچه
         state["history"] = state["history"][-2000:]
         with open(state_file, "w") as f:
             json.dump(state, f)
+        print(f"--- ✨ Done. {count} tracks added to @FavmeMusic ---")
 
 if __name__ == "__main__":
     asyncio.run(music_hunter())
