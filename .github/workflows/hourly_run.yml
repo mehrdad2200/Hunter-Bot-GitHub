@@ -2,12 +2,14 @@ name: Hourly Config Aggregator
 
 on:
   schedule:
-    - cron: '0 * * * *' # هر یک ساعت اجرا می‌شود
-  workflow_dispatch: # امکان اجرای دستی
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # اجازه نوشتن برای ساخت برنچ gh-pages
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -20,11 +22,25 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pyrogram tgcrypto jdatetime
 
-      - name: Run script
+      - name: Run Aggregator (Telegram Post)
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python aggregator.py
+
+      - name: Run Sub Generator (Create Index)
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python sub_generator.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_files: index.html
