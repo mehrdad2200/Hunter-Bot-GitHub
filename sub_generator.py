@@ -1,25 +1,17 @@
-import asyncio, os, re
-from pyrogram import Client
+import os
 
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-SESSION_STRING = os.environ.get("SESSION_STRING")
-CHANNEL_ID = "favproxy"
+def generate_sub():
+    # خواندن کانفیگ‌های تایید شده
+    if os.path.exists("validated_configs.txt"):
+        with open("validated_configs.txt", "r", encoding="utf-8") as f:
+            content = f.read()
 
-app = Client("sub_gen", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
-
-async def generate_sub():
-    async with app:
-        configs = []
-        # ۱۰۰ پیام آخر کانال برای ساب‌لینک
-        async for message in app.get_chat_history(CHANNEL_ID, limit=100):
-            if message.text:
-                links = re.findall(r'(?:vless|vmess|trojan|ss)://[^\s"\'<>]+', message.text)
-                configs.extend(links)
-
-        unique_configs = list(set(configs))
+        # ساخت فایل index.html برای نمایش در لینک مستقیم
         with open("index.html", "w", encoding="utf-8") as f:
-            f.write("\n".join(unique_configs))
+            f.write(content)
+        print("index.html created successfully.")
+    else:
+        print("No validated_configs.txt found to generate sub.")
 
 if __name__ == "__main__":
-    app.run(generate_sub())
+    generate_sub()
