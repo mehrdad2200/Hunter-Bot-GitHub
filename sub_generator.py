@@ -1,13 +1,16 @@
 import asyncio, os, base64, re
 from pyrogram import Client
 
+# تنظیمات از Secrets
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 
+# منابع شکار پروکسی
 SOURCES = [
     "v2ray_outline_config", "V2rayNG_VPNN", "v2ray_swat", 
-    "FreeVlessConfig", "v2rayNG_Config", "iSegaro"
+    "FreeVlessConfig", "v2rayNG_Config", "iSegaro",
+    "VmessProtocol", "V2Ray_Alpha"
 ]
 
 async def get_configs():
@@ -16,19 +19,25 @@ async def get_configs():
         found_configs = []
         for source in SOURCES:
             try:
-                async for message in app.get_chat_history(source, limit=50):
+                async for message in app.get_chat_history(source, limit=100):
                     if message.text:
+                        # پیدا کردن تمام پروتکل‌های V2Ray
                         links = re.findall(r"(vless|vmess|ss|trojan)://[^\s]+", message.text)
                         found_configs.extend(links)
             except: continue
         
         unique_configs = list(set(found_configs))
         if unique_configs:
+            # ساخت متن خام و تبدیل به Base64 (استاندارد Sub)
             raw_content = "\n".join(unique_configs)
             b64_content = base64.b64encode(raw_content.encode('utf-8')).decode('utf-8')
+            
+            # ذخیره در فایل اصلی سایت
             with open("index.html", "w") as f:
                 f.write(b64_content)
             print(f"✅ Sub updated with {len(unique_configs)} configs.")
+        else:
+            print("❌ No configs found!")
 
 if __name__ == "__main__":
     asyncio.run(get_configs())
