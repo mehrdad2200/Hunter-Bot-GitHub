@@ -1,9 +1,9 @@
-name: File Sync Hunter
+name: File Sync Hunter (No Duplicate)
 
 on:
   schedule:
-    - cron: '30 * * * *' # هر یک ساعت، دقیقه ۳۰ اجرا می‌شود
-  workflow_dispatch: # اجرای دستی
+    - cron: '*/30 * * * *' # هر ۳۰ دقیقه یکبار اجرا می‌شود
+  workflow_dispatch:
 
 jobs:
   sync_files:
@@ -26,3 +26,11 @@ jobs:
           API_HASH: ${{ secrets.API_HASH }}
           SESSION_STRING: ${{ secrets.SESSION_STRING }}
         run: python file_hunter.py
+
+      - name: Save Last Post ID
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add last_post_id.txt
+          git commit -m "Update last copied post ID" || exit 0
+          git push origin main
