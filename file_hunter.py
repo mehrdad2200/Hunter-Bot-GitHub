@@ -13,7 +13,7 @@ MY_ID = "@favFile"
 LAST_ID_FILE = "last_post_id.txt"
 
 async def copy_ordered():
-    app = Client("file_hunter", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
+    app = Client("file_hunter", api_id=API_ID, api_hash=API_HASH, session_string=STRING_SESSION)
     
     async with app:
         # ۱. خوندن آیدی آخرین پستی که قبلاً کپی شده
