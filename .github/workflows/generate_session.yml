@@ -1,0 +1,46 @@
+name: Generate Pyrogram Session
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-session:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyrogram tgcrypto
+
+      - name: Generate session string
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+        run: |
+          python << 'EOF'
+          from pyrogram import Client
+          import os
+
+          api_id = int(os.environ["API_ID"])
+          api_hash = os.environ["API_HASH"]
+
+          with Client(
+              "session",
+              api_id=api_id,
+              api_hash=api_hash
+          ) as app:
+              print("\n" + "="*60)
+              print("YOUR SESSION STRING (COPY ALL BELOW)")
+              print("="*60 + "\n")
+              print(app.export_session_string())
+              print("\n" + "="*60)
+          EOF
