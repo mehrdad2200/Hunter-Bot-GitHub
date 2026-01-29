@@ -1,0 +1,28 @@
+name: File Sync Hunter
+
+on:
+  schedule:
+    - cron: '30 * * * *' # هر یک ساعت، دقیقه ۳۰ اجرا می‌شود
+  workflow_dispatch: # اجرای دستی
+
+jobs:
+  sync_files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install pyrogram tgcrypto
+
+      - name: Run File Hunter
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+        run: python file_hunter.py
