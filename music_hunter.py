@@ -18,6 +18,7 @@ PRIORITY_SOURCES = [
     "https://t.me/joinchat/P98_Guz-df0D8Pj2",
     "foreignmusiconly",
     "f_music_only",
+    "favme",
     "https://t.me/addlist/y3ZeJkAEiGNiY2Nk"
 ]
 
