@@ -3,11 +3,16 @@ name: File Sync Hunter (No Duplicate)
 on:
   schedule:
     - cron: '*/30 * * * *' # هر ۳۰ دقیقه یکبار اجرا می‌شود
-  workflow_dispatch:
+  workflow_dispatch: # امکان اجرای دستی
 
 jobs:
   sync_files:
     runs-on: ubuntu-latest
+    
+    # اجازه دسترسی برای آپدیت کردن فایل last_post_id.txt در گیت‌هاب
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -24,13 +29,14 @@ jobs:
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
-          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+          STRING_SESSION: ${{ secrets.STRING_SESSION }} # دقیقاً مطابق عکس شما
         run: python file_hunter.py
 
-      - name: Save Last Post ID
+      - name: Save Last Post ID to Repo
+        # این مرحله آیدی آخرین پستی که کپی شده را در گیت‌هاب ذخیره می‌کند تا دفعه بعد تکراری نیاید
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add last_post_id.txt
-          git commit -m "Update last copied post ID" || exit 0
+          git commit -m "Update last copied post ID: $(cat last_post_id.txt)" || exit 0
           git push origin main
